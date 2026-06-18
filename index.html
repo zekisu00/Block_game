@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>打磚塊遊戲</title>
+
+<style>
+body{
+    margin:0;
+    font-family:Segoe UI;
+    background:#050510;
+    color:white;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+}
+
+#gameContainer{
+    position:relative;
+    border:1px solid #00f5ff;
+    box-shadow:0 0 20px #00f5ff;
+}
+
+canvas{
+    background:linear-gradient(180deg,#0a0a2a,#050515);
+    display:block;
+}
+
+#menu,#gameOver{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.85);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+}
+
+#gameOver{
+    display:none;
+    font-size:28px;
+}
+
+#winScreen{
+    position:fixed;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.9);
+    font-size:40px;
+    z-index:99;
+}
+
+.rule-box{
+    margin-top:10px;
+    width:480px;
+    background:rgba(0,0,0,0.3);
+    border-left:3px solid #00f5ff;
+    padding:10px;
+    font-size:13px;
+    color:#ccc;
+}
+.rule-box h3{color:#00f5ff;}
+
+.retry-btn{
+    margin-top:20px;
+    padding:10px 20px;
+    font-size:16px;
+    background:#00f5ff;
+    color:#000;
+    border:none;
+    cursor:pointer;
+    transition:0.2s;
+}
+</style>
+</head>
+
+<body>
+
+<div id="gameContainer">
+<canvas id="gameCanvas" width="480" height="320"></canvas>
+
+<div id="menu">
+    <h2>START</h2>
+    <button onclick="startGame()">PLAY</button>
+</div>
+
+<div id="gameOver">
+    <div>💀 GAME OVER</div>
+    <button class="retry-btn" onclick="restart()">RETRY</button>
+</div>
+
+</div>
+
+<div id="winScreen">🏆 WIN 🏆</div>
+
+<script>
+
+/* =========================
+   DEV CONFIG
+========================= */
+const CONFIG = {
+    FAIL_YOUTUBE_URL: "https://www.youtube.com/watch?v=Aq5WXmQQooo",
+    WIN_YOUTUBE_URL: "https://www.youtube.com/watch?v=I1NElpKjm74",
+    FAIL_TRIGGER_COUNT: 10
+};
+
+const canvas=document.getElementById("gameCanvas");
+const ctx=canvas.getContext("2d");
+
+let x,y,dx,dy;
+let paddleX;
+
+const TOTAL_BRICKS=15;
+const ROWS=3;
+const COLS=5;
+
+let bricks=[];
+
+let failCount=0;
+let gameRunning=false;
+
+let right=false,left=false;
+
+/* =========================
+   DEV MODE UI
+========================= */
+let devInputBox=null;
+
+function openDevConsole(){
+    if(devInputBox) return;
+
+    devInputBox=document.createElement("input");
+    devInputBox.placeholder="輸入 pass / fail";
+    devInputBox.style.position="fixed";
+    devInputBox.style.top="20px";
+    devInputBox.style.left="50%";
+    devInputBox.style.transform="translateX(-50%)";
+    devInputBox.style.padding="10px";
+    devInputBox.style.fontSize="16px";
+    devInputBox.style.zIndex="9999";
+    devInputBox.style.border="2px solid #00f5ff";
+    devInputBox.style.background="#000";
+    devInputBox.style.color="#fff";
+
+    document.body.appendChild(devInputBox);
+    devInputBox.focus();
+
+    devInputBox.addEventListener("keydown",e=>{
+        if(e.key==="Enter"){
+            handleDevCommand(devInputBox.value.trim());
+            devInputBox.remove();
+            devInputBox=null;
+        }
+    });
+}
+
+function handleDevCommand(cmd){
+
+    if(cmd==="pass"){
+        winGame();
+    }
+
+    if(cmd==="fail"){
+        failCount = CONFIG.FAIL_TRIGGER_COUNT;
+        window.location.href = CONFIG.FAIL_YOUTUBE_URL;
+    }
+}
+
+/* =========================
+   INIT
+========================= */
+function init(){
+    x=240;
+    y=260;
+    paddleX=200;
+
+    dx=3;
+    dy=-3;
+
+    generateLevel();
+}
+
+/* ========================= */
+function generateLevel(){
+    bricks=[];
+    let count=0;
+
+    for(let c=0;c<COLS;c++){
+        bricks[c]=[];
+        for(let r=0;r<ROWS;r++){
+
+            if(count<TOTAL_BRICKS){
+                bricks[c][r]={status:1,color:`hsl(${count*20},100%,60%)`};
+            }else{
+                bricks[c][r]={status:0};
+            }
+            count++;
+        }
+    }
+}
+
+/* ========================= */
+document.addEventListener("keydown",e=>{
+
+    if(e.key==="ArrowRight") right=true;
+    if(e.key==="ArrowLeft") left=true;
+
+    // 🔧 DEV MODE HOTKEY
+    if(e.ctrlKey && e.shiftKey && e.code==="F10"){
+        openDevConsole();
+    }
+});
+
+/* ========================= */
+document.addEventListener("keyup",e=>{
+    if(e.key==="ArrowRight") right=false;
+    if(e.key==="ArrowLeft") left=false;
+});
+
+/* ========================= */
+function startGame(){
+    failCount=0;
+    init();
+    document.getElementById("menu").style.display="none";
+    gameRunning=true;
+    loop();
+}
+
+function restart(){
+    document.getElementById("gameOver").style.display="none";
+    init();
+    gameRunning=true;
+    loop();
+}
+
+/* =========================
+   FAIL SYSTEM
+========================= */
+function addFail(){
+
+    failCount++;
+
+    if(failCount >= CONFIG.FAIL_TRIGGER_COUNT){
+        window.location.href = CONFIG.FAIL_YOUTUBE_URL;
+        return;
+    }
+
+    gameRunning=false;
+    document.getElementById("gameOver").style.display="flex";
+}
+
+/* =========================
+   WIN SYSTEM
+========================= */
+function winGame(){
+
+    gameRunning=false;
+
+    document.getElementById("winScreen").style.display="flex";
+
+    setTimeout(()=>{
+        window.location.href = CONFIG.WIN_YOUTUBE_URL;
+    },1500);
+}
+
+/* =========================
+   GAME LOOP
+========================= */
+function loop(){
+
+    if(!gameRunning) return;
+
+    ctx.clearRect(0,0,480,320);
+
+    ctx.fillStyle="#00f5ff";
+    ctx.fillRect(paddleX,300,80,10);
+
+    ctx.fillStyle="#ff00ff";
+    ctx.beginPath();
+    ctx.arc(x,y,7,0,Math.PI*2);
+    ctx.fill();
+
+    let alive=0;
+
+    for(let c=0;c<bricks.length;c++){
+        for(let r=0;r<bricks[c].length;r++){
+
+            let b=bricks[c][r];
+            if(b.status){
+
+                alive++;
+
+                let bx=c*90+20;
+                let by=r*40+30;
+
+                ctx.fillStyle=b.color;
+                ctx.fillRect(bx,by,70,20);
+
+                if(x>bx && x<bx+70 && y>by && y<by+20){
+                    dy=-dy;
+                    b.status=0;
+                }
+            }
+        }
+    }
+
+    if(alive===0){
+        winGame();
+        return;
+    }
+
+    if(right) paddleX+=8;
+    if(left) paddleX-=8;
+
+    x+=dx;
+    y+=dy;
+
+    if(x<0||x>480) dx=-dx;
+    if(y<0) dy=-dy;
+
+    if(y>300){
+        if(x>paddleX && x<paddleX+80){
+            dy=-dy;
+        } else {
+            addFail();
+            init();
+        }
+    }
+
+    requestAnimationFrame(loop);
+}
+
+</script>
+
+</body>
+</html>
