@@ -17,17 +17,20 @@ body{
     min-height:100vh;
 }
 
+/* 遊戲外框 */
 #gameContainer{
     position:relative;
     border:1px solid #00f5ff;
     box-shadow:0 0 20px #00f5ff;
 }
 
+/* 畫布 */
 canvas{
     background:linear-gradient(180deg,#0a0a2a,#050515);
     display:block;
 }
 
+/* 選單與結束畫面 */
 #menu,#gameOver{
     position:absolute;
     inset:0;
@@ -43,6 +46,7 @@ canvas{
     font-size:28px;
 }
 
+/* 勝利畫面 */
 #winScreen{
     position:fixed;
     inset:0;
@@ -55,6 +59,7 @@ canvas{
     z-index:99;
 }
 
+/* 規則區塊（目前未使用但保留） */
 .rule-box{
     margin-top:10px;
     width:480px;
@@ -66,6 +71,7 @@ canvas{
 }
 .rule-box h3{color:#00f5ff;}
 
+/* 重新開始按鈕 */
 .retry-btn{
     margin-top:20px;
     padding:10px 20px;
@@ -82,26 +88,28 @@ canvas{
 <body>
 
 <div id="gameContainer">
-<canvas id="gameCanvas" width="480" height="320"></canvas>
+    <canvas id="gameCanvas" width="480" height="320"></canvas>
 
-<div id="menu">
-    <h2>START</h2>
-    <button onclick="startGame()">PLAY</button>
+    <!-- 主選單 -->
+    <div id="menu">
+        <h2>START</h2>
+        <button onclick="startGame()">PLAY</button>
+    </div>
+
+    <!-- 遊戲失敗畫面 -->
+    <div id="gameOver">
+        <div>💀 GAME OVER</div>
+        <button class="retry-btn" onclick="restart()">RETRY</button>
+    </div>
 </div>
 
-<div id="gameOver">
-    <div>💀 GAME OVER</div>
-    <button class="retry-btn" onclick="restart()">RETRY</button>
-</div>
-
-</div>
-
+<!-- 勝利畫面 -->
 <div id="winScreen">🏆 WIN 🏆</div>
 
 <script>
 
 /* =========================
-   DEV CONFIG
+   DEV CONFIG（開發設定）
 ========================= */
 const CONFIG = {
     FAIL_YOUTUBE_URL: "https://www.youtube.com/watch?v=Aq5WXmQQooo",
@@ -109,43 +117,57 @@ const CONFIG = {
     FAIL_TRIGGER_COUNT: 10
 };
 
+/* 取得 canvas 畫布 */
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
 
+/* 球的位置與速度 */
 let x,y,dx,dy;
+
+/* 板子 X 座標 */
 let paddleX;
 
+/* 磚塊數量設定 */
 const TOTAL_BRICKS=15;
 const ROWS=3;
 const COLS=5;
 
+/* 磚塊陣列 */
 let bricks=[];
 
+/* 失敗次數 */
 let failCount=0;
+
+/* 遊戲是否進行中 */
 let gameRunning=false;
 
+/* 按鍵狀態 */
 let right=false,left=false;
 
 /* =========================
-   DEV MODE UI
+   DEV CONSOLE（開發模式）
 ========================= */
 let devInputBox=null;
 
+/* 打開開發指令輸入框 */
 function openDevConsole(){
     if(devInputBox) return;
 
     devInputBox=document.createElement("input");
     devInputBox.placeholder="輸入 pass / fail";
-    devInputBox.style.position="fixed";
-    devInputBox.style.top="20px";
-    devInputBox.style.left="50%";
-    devInputBox.style.transform="translateX(-50%)";
-    devInputBox.style.padding="10px";
-    devInputBox.style.fontSize="16px";
-    devInputBox.style.zIndex="9999";
-    devInputBox.style.border="2px solid #00f5ff";
-    devInputBox.style.background="#000";
-    devInputBox.style.color="#fff";
+
+    Object.assign(devInputBox.style,{
+        position:"fixed",
+        top:"20px",
+        left:"50%",
+        transform:"translateX(-50%)",
+        padding:"10px",
+        fontSize:"16px",
+        zIndex:"9999",
+        border:"2px solid #00f5ff",
+        background:"#000",
+        color:"#fff"
+    });
 
     document.body.appendChild(devInputBox);
     devInputBox.focus();
@@ -159,8 +181,8 @@ function openDevConsole(){
     });
 }
 
+/* 處理開發指令 */
 function handleDevCommand(cmd){
-
     if(cmd==="pass"){
         winGame();
     }
@@ -172,11 +194,13 @@ function handleDevCommand(cmd){
 }
 
 /* =========================
-   INIT
+   初始化遊戲
 ========================= */
 function init(){
     x=240;
     y=260;
+
+    /* 板子初始位置 */
     paddleX=200;
 
     dx=3;
@@ -185,7 +209,9 @@ function init(){
     generateLevel();
 }
 
-/* ========================= */
+/* =========================
+   建立磚塊
+========================= */
 function generateLevel(){
     bricks=[];
     let count=0;
@@ -195,7 +221,10 @@ function generateLevel(){
         for(let r=0;r<ROWS;r++){
 
             if(count<TOTAL_BRICKS){
-                bricks[c][r]={status:1,color:`hsl(${count*20},100%,60%)`};
+                bricks[c][r]={
+                    status:1,
+                    color:`hsl(${count*20},100%,60%)`
+                };
             }else{
                 bricks[c][r]={status:0};
             }
@@ -204,25 +233,27 @@ function generateLevel(){
     }
 }
 
-/* ========================= */
+/* =========================
+   鍵盤控制
+========================= */
 document.addEventListener("keydown",e=>{
-
     if(e.key==="ArrowRight") right=true;
     if(e.key==="ArrowLeft") left=true;
 
-    // 🔧 DEV MODE HOTKEY
+    /* Ctrl + Shift + F10 開啟 dev console */
     if(e.ctrlKey && e.shiftKey && e.code==="F10"){
         openDevConsole();
     }
 });
 
-/* ========================= */
 document.addEventListener("keyup",e=>{
     if(e.key==="ArrowRight") right=false;
     if(e.key==="ArrowLeft") left=false;
 });
 
-/* ========================= */
+/* =========================
+   開始 / 重開
+========================= */
 function startGame(){
     failCount=0;
     init();
@@ -239,10 +270,9 @@ function restart(){
 }
 
 /* =========================
-   FAIL SYSTEM
+   失敗系統
 ========================= */
 function addFail(){
-
     failCount++;
 
     if(failCount >= CONFIG.FAIL_TRIGGER_COUNT){
@@ -255,10 +285,9 @@ function addFail(){
 }
 
 /* =========================
-   WIN SYSTEM
+   勝利系統
 ========================= */
 function winGame(){
-
     gameRunning=false;
 
     document.getElementById("winScreen").style.display="flex";
@@ -269,7 +298,7 @@ function winGame(){
 }
 
 /* =========================
-   GAME LOOP
+   遊戲主迴圈
 ========================= */
 function loop(){
 
@@ -277,9 +306,11 @@ function loop(){
 
     ctx.clearRect(0,0,480,320);
 
+    /* 畫板子 */
     ctx.fillStyle="#00f5ff";
     ctx.fillRect(paddleX,300,80,10);
 
+    /* 畫球 */
     ctx.fillStyle="#ff00ff";
     ctx.beginPath();
     ctx.arc(x,y,7,0,Math.PI*2);
@@ -287,12 +318,13 @@ function loop(){
 
     let alive=0;
 
+    /* 畫磚塊 */
     for(let c=0;c<bricks.length;c++){
         for(let r=0;r<bricks[c].length;r++){
 
             let b=bricks[c][r];
-            if(b.status){
 
+            if(b.status){
                 alive++;
 
                 let bx=c*90+20;
@@ -301,6 +333,7 @@ function loop(){
                 ctx.fillStyle=b.color;
                 ctx.fillRect(bx,by,70,20);
 
+                /* 碰撞磚塊 */
                 if(x>bx && x<bx+70 && y>by && y<by+20){
                     dy=-dy;
                     b.status=0;
@@ -309,20 +342,33 @@ function loop(){
         }
     }
 
+    /* 勝利條件 */
     if(alive===0){
         winGame();
         return;
     }
 
+    /* =========================
+       🔥 修正重點：板子不能超出畫面
+       這是你原本 bug 的原因
+    ========================= */
+
     if(right) paddleX+=8;
     if(left) paddleX-=8;
 
+    // ⭐ 限制板子在 canvas 範圍內（0 ~ 480 - 80）
+    if(paddleX < 0) paddleX = 0;
+    if(paddleX > 480 - 80) paddleX = 480 - 80;
+
+    /* 球移動 */
     x+=dx;
     y+=dy;
 
+    /* 邊界反彈 */
     if(x<0||x>480) dx=-dx;
     if(y<0) dy=-dy;
 
+    /* 板子碰撞 / 掉落判定 */
     if(y>300){
         if(x>paddleX && x<paddleX+80){
             dy=-dy;
